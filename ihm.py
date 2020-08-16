@@ -1,7 +1,3 @@
-# author = DeFinch
-# team   = hnot,idd,iaso,& cottage enthusiast code
-# tools  = instahackmini 2020
-
 import requests
 import json
 import time
