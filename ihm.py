@@ -71,7 +71,7 @@ def follow(sess, username):
         return
     else:
         userID = username['id']
-        followReq = sess.post('https://www.instagram.com/'userID)
+        followReq = sess.post('https://www.instagram.com/' userID)
         print(followReq.text)
 
 
