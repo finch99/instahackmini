@@ -8,3 +8,5 @@ create by python
 author tidak bertanggung jawab atas dampak buruk terhadap pengguna.
 tools hanya untuk pembelajaran semata.
 gunakan dengan bijak.
+# Disclaimer!
+NEVER UPDATE THIS TOOLS
