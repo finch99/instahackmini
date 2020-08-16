@@ -4,3 +4,7 @@ instahackmini bruteforce attack by python project
 leader of HNOT,IDD,IASO & COTTAGE ENTHUSIAST CODE
 copyright 2020
 create by python 
+# attention
+author tidak bertanggung jawab atas dampak buruk terhadap pengguna.
+tools hanya untuk pembelajaran semata.
+gunakan dengan bijak.
